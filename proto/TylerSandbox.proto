@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package tgsbpb;
+
+option go_package = "./pkg/tgsbpb";
+
+service TylerSandboxService {
+  rpc UnaryCallString(UnaryCallStringRequest) returns (UnaryCallStringResponse) {}
+  rpc UnaryCallInt(UnaryCallIntRequest) returns (UnaryCallIntResponse) {}
+
+  rpc ServerStreamString(ServerStreamStringRequest) returns (stream ServerStreamStringResponse) {}
+  rpc ServerStreamInt(ServerStreamIntRequest) returns (stream ServerStreamIntResponse) {}
+
+  rpc ClientStreamString(stream ClientStreamStringRequest) returns (ClientStreamStringResponse) {}
+  rpc ClientStreamInt(stream ClientStreamIntRequest) returns (ClientStreamIntResponse) {}
+
+  rpc BidirectionalStreamString(stream BidirectionalStreamStringRequest) returns (stream BidirectionalStreamStringResponse) {}
+  rpc BidirectionalStreamInt(stream BidirectionalStreamIntRequest) returns (stream BidirectionalStreamIntResponse) {}
+}
+
+message UnaryCallStringRequest {
+  string value = 1;
+}
+
+message UnaryCallStringResponse {
+  string value = 1;
+}
+
+message UnaryCallIntRequest {
+  int32 value = 1;
+}
+
+message UnaryCallIntResponse {
+  int32 value = 1;
+}
+
+message ServerStreamStringRequest {
+  string value = 1;
+}
+
+message ServerStreamStringResponse {
+  string value = 1;
+}
+
+message ServerStreamIntRequest {
+  int32 value = 1;
+}
+
+message ServerStreamIntResponse {
+  int32 value = 1;
+}
+
+message ClientStreamStringRequest {
+  string value = 1;
+}
+
+message ClientStreamStringResponse {
+  string value = 1;
+}
+
+message ClientStreamIntRequest {
+  int32 value = 1;
+}
+
+message ClientStreamIntResponse {
+  int32 value = 1;
+}
+
+message BidirectionalStreamStringRequest {
+  string value = 1;
+}
+
+message BidirectionalStreamStringResponse {
+  string value = 1;
+}
+
+message BidirectionalStreamIntRequest {
+  int32 value = 1;
+}
+
+message BidirectionalStreamIntResponse {
+  int32 value = 1;
+}
+
+
