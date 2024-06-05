@@ -26,6 +26,7 @@ const (
 	TylerSandboxService_ClientStreamString_FullMethodName        = "/tgsbpb.TylerSandboxService/ClientStreamString"
 	TylerSandboxService_ClientStreamInt_FullMethodName           = "/tgsbpb.TylerSandboxService/ClientStreamInt"
 	TylerSandboxService_BidirectionalStreamString_FullMethodName = "/tgsbpb.TylerSandboxService/BidirectionalStreamString"
+	TylerSandboxService_BidirectionalStreamInt_FullMethodName    = "/tgsbpb.TylerSandboxService/BidirectionalStreamInt"
 )
 
 // TylerSandboxServiceClient is the client API for TylerSandboxService service.
@@ -39,6 +40,7 @@ type TylerSandboxServiceClient interface {
 	ClientStreamString(ctx context.Context, opts ...grpc.CallOption) (TylerSandboxService_ClientStreamStringClient, error)
 	ClientStreamInt(ctx context.Context, opts ...grpc.CallOption) (TylerSandboxService_ClientStreamIntClient, error)
 	BidirectionalStreamString(ctx context.Context, opts ...grpc.CallOption) (TylerSandboxService_BidirectionalStreamStringClient, error)
+	BidirectionalStreamInt(ctx context.Context, opts ...grpc.CallOption) (TylerSandboxService_BidirectionalStreamIntClient, error)
 }
 
 type tylerSandboxServiceClient struct {
@@ -230,6 +232,37 @@ func (x *tylerSandboxServiceBidirectionalStreamStringClient) Recv() (*Bidirectio
 	return m, nil
 }
 
+func (c *tylerSandboxServiceClient) BidirectionalStreamInt(ctx context.Context, opts ...grpc.CallOption) (TylerSandboxService_BidirectionalStreamIntClient, error) {
+	stream, err := c.cc.NewStream(ctx, &TylerSandboxService_ServiceDesc.Streams[5], TylerSandboxService_BidirectionalStreamInt_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &tylerSandboxServiceBidirectionalStreamIntClient{stream}
+	return x, nil
+}
+
+type TylerSandboxService_BidirectionalStreamIntClient interface {
+	Send(*BidirectionalStreamIntRequest) error
+	Recv() (*BidirectionalStreamIntResponse, error)
+	grpc.ClientStream
+}
+
+type tylerSandboxServiceBidirectionalStreamIntClient struct {
+	grpc.ClientStream
+}
+
+func (x *tylerSandboxServiceBidirectionalStreamIntClient) Send(m *BidirectionalStreamIntRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *tylerSandboxServiceBidirectionalStreamIntClient) Recv() (*BidirectionalStreamIntResponse, error) {
+	m := new(BidirectionalStreamIntResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // TylerSandboxServiceServer is the server API for TylerSandboxService service.
 // All implementations must embed UnimplementedTylerSandboxServiceServer
 // for forward compatibility
@@ -241,6 +274,7 @@ type TylerSandboxServiceServer interface {
 	ClientStreamString(TylerSandboxService_ClientStreamStringServer) error
 	ClientStreamInt(TylerSandboxService_ClientStreamIntServer) error
 	BidirectionalStreamString(TylerSandboxService_BidirectionalStreamStringServer) error
+	BidirectionalStreamInt(TylerSandboxService_BidirectionalStreamIntServer) error
 	mustEmbedUnimplementedTylerSandboxServiceServer()
 }
 
@@ -268,6 +302,9 @@ func (UnimplementedTylerSandboxServiceServer) ClientStreamInt(TylerSandboxServic
 }
 func (UnimplementedTylerSandboxServiceServer) BidirectionalStreamString(TylerSandboxService_BidirectionalStreamStringServer) error {
 	return status.Errorf(codes.Unimplemented, "method BidirectionalStreamString not implemented")
+}
+func (UnimplementedTylerSandboxServiceServer) BidirectionalStreamInt(TylerSandboxService_BidirectionalStreamIntServer) error {
+	return status.Errorf(codes.Unimplemented, "method BidirectionalStreamInt not implemented")
 }
 func (UnimplementedTylerSandboxServiceServer) mustEmbedUnimplementedTylerSandboxServiceServer() {}
 
@@ -438,6 +475,32 @@ func (x *tylerSandboxServiceBidirectionalStreamStringServer) Recv() (*Bidirectio
 	return m, nil
 }
 
+func _TylerSandboxService_BidirectionalStreamInt_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(TylerSandboxServiceServer).BidirectionalStreamInt(&tylerSandboxServiceBidirectionalStreamIntServer{stream})
+}
+
+type TylerSandboxService_BidirectionalStreamIntServer interface {
+	Send(*BidirectionalStreamIntResponse) error
+	Recv() (*BidirectionalStreamIntRequest, error)
+	grpc.ServerStream
+}
+
+type tylerSandboxServiceBidirectionalStreamIntServer struct {
+	grpc.ServerStream
+}
+
+func (x *tylerSandboxServiceBidirectionalStreamIntServer) Send(m *BidirectionalStreamIntResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *tylerSandboxServiceBidirectionalStreamIntServer) Recv() (*BidirectionalStreamIntRequest, error) {
+	m := new(BidirectionalStreamIntRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // TylerSandboxService_ServiceDesc is the grpc.ServiceDesc for TylerSandboxService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -478,6 +541,12 @@ var TylerSandboxService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "BidirectionalStreamString",
 			Handler:       _TylerSandboxService_BidirectionalStreamString_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "BidirectionalStreamInt",
+			Handler:       _TylerSandboxService_BidirectionalStreamInt_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
