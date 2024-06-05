@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/TylerJGabb/grpc-http-proxy/internal/unary"
+
 	"github.com/TylerJGabb/grpc-http-proxy/pkg/tgsbpb"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -59,7 +60,7 @@ func (hps *HttpProxyServer) RunBlocking() error {
 	app.Use(func(context *gin.Context) {
 		context.Set("client", client)
 	})
-	app.POST("/unarycallstring", unary.ProxyStringRequest)
-	app.POST("/unarycallint", unary.ProxyIntRequest)
+	unary.ApplyUnaryProxy(app, unary.UnaryCallIntProxy{})
+	unary.ApplyUnaryProxy(app, unary.UnaryCallStringProxy{})
 	return app.Run(fmt.Sprintf(":%d", hps.port))
 }

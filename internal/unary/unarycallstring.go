@@ -1,39 +1,26 @@
 package unary
 
 import (
-	"fmt"
-	"io"
+	"context"
 
 	"github.com/TylerJGabb/grpc-http-proxy/pkg/tgsbpb"
-	"github.com/gin-gonic/gin"
-	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
-func ProxyStringRequest(c *gin.Context) {
-	client := c.MustGet("client").(tgsbpb.TylerSandboxServiceClient)
-	var requestBody tgsbpb.UnaryCallStringRequest
-	body, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		fmt.Printf("error reading request body: %v", err)
-		return
-	}
+type UnaryCallStringProxy struct{}
 
-	if err := protojson.Unmarshal(body, &requestBody); err != nil {
-		fmt.Printf("error unmarshalling request body: %v", err)
-		c.String(400, "error unmarshalling request body: %v", err)
-	}
+func (u UnaryCallStringProxy) Path() string {
+	return "/unarycallstring"
+}
 
-	response, err := client.UnaryCallString(c, &requestBody)
-	if err != nil {
-		fmt.Printf("error proxying request: %v", err)
-		c.String(500, "error calling proxying: %v", err)
-	}
+func (u UnaryCallStringProxy) UnaryCall(
+	ctx context.Context,
+	client tgsbpb.TylerSandboxServiceClient,
+	request *tgsbpb.UnaryCallStringRequest,
+) (proto.Message, error) {
+	return client.UnaryCallString(ctx, request)
+}
 
-	responseBody, err := protojson.Marshal(response)
-	if err != nil {
-		fmt.Printf("error marshalling response: %v", err)
-		c.String(500, "error marshalling response: %v", err)
-	}
-
-	c.Data(200, "application/json", responseBody)
+func (u UnaryCallStringProxy) NewGrpcMessage() *tgsbpb.UnaryCallStringRequest {
+	return &tgsbpb.UnaryCallStringRequest{}
 }
