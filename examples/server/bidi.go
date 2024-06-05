@@ -3,46 +3,32 @@ package main
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
+	"io"
 
 	"github.com/TylerJGabb/grpc-http-proxy/pkg/tgsbpb"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
-
-func debugGoroutineCount(wg *sync.WaitGroup) {
-	go func() {
-		ch := make(chan struct{})
-		go func() {
-			wg.Wait()
-			close(ch)
-		}()
-		select {
-		case <-ch:
-			fmt.Print("goroutine leak check passed\n")
-		case <-time.After(time.Second * 5):
-			fmt.Println("!!GOROUTINE LEAK!! timeout waiting for all responses to be sent")
-		}
-	}()
-}
 
 func (s *exampleServer) BidirectionalStreamString(
 	stream tgsbpb.TylerSandboxService_BidirectionalStreamStringServer,
 ) error {
+	// when we return out of this method, the context of the stream will be canceled
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 	in := make(chan *tgsbpb.BidirectionalStreamStringRequest)
 	errs := make(chan error, 1)
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
-	defer debugGoroutineCount(wg)
 	go func() {
-		defer wg.Done()
-		defer fmt.Println("receiver done")
 		for {
+			// this is a blocking call, will unblock when stream context is canceled
 			msg, err := stream.Recv()
 			if err != nil {
-				fmt.Printf("receive error: %s\n", err.Error())
-				errs <- err
+				if err == io.EOF {
+					cancel()
+				} else {
+					fmt.Printf("receive error: %s\n", err.Error())
+					errs <- err
+				}
 				return
 			}
 			select {
@@ -52,37 +38,26 @@ func (s *exampleServer) BidirectionalStreamString(
 			}
 		}
 	}()
-	go func() {
-		defer wg.Done()
-		defer fmt.Println("sender done")
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case req := <-in:
-				if req.Close {
-					fmt.Println("closing")
-					cancel()
-					return
-				}
-				if req.RespondWithError {
-					fmt.Println("intentionally returned error")
-					errs <- fmt.Errorf("intentionally returned error")
-					return
-				}
-				send := &tgsbpb.BidirectionalStreamStringResponse{Value: req.Value}
-				if err := stream.Send(send); err != nil {
-					fmt.Printf("send error: %s\n", err.Error())
-					errs <- err
-					return
-				}
+	for {
+		select {
+		case err := <-errs:
+			return err
+		case <-ctx.Done():
+			return nil
+		case req := <-in:
+			if req.Close {
+				cancel()
+				return status.Error(codes.Canceled, "stream closed intentionally")
+			}
+			if req.RespondWithError {
+				return status.Error(codes.Internal, "error returned intentionally")
+			}
+			send := &tgsbpb.BidirectionalStreamStringResponse{Value: req.Value}
+			// this is a blocking call, will unblock when stream context is canceled
+			if err := stream.Send(send); err != nil {
+				fmt.Printf("send error: %s\n", err.Error())
+				return err
 			}
 		}
-	}()
-	select {
-	case err := <-errs:
-		return err
-	case <-ctx.Done():
-		return nil
 	}
 }
