@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (s *exampleServer) BidirectionalStreamInt(
+func (s *ExampleServer) BidirectionalStreamInt(
 	stream tgsbpb.TylerSandboxService_BidirectionalStreamIntServer,
 ) error {
 	// when we return out of this method, the context of the stream will be canceled

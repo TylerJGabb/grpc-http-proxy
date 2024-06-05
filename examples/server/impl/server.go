@@ -1,7 +1,6 @@
-package main
+package server
 
 import (
-	"flag"
 	"fmt"
 	"net"
 
@@ -10,11 +9,11 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-type exampleServer struct {
+type ExampleServer struct {
 	tgsbpb.UnimplementedTylerSandboxServiceServer
 }
 
-func (s *exampleServer) Start(port int) string {
+func (s *ExampleServer) Start(port int) string {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		panic(err)
@@ -29,12 +28,4 @@ func (s *exampleServer) Start(port int) string {
 		}
 	}()
 	return listener.Addr().String()
-}
-
-func main() {
-	port := flag.Int("port", 50054, "the port number")
-	flag.Parse()
-	s := exampleServer{}
-	s.Start(*port)
-	select {}
 }

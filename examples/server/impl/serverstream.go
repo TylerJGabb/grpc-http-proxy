@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (s *exampleServer) ServerStreamInt(
+func (s *ExampleServer) ServerStreamInt(
 	req *tgsbpb.ServerStreamIntRequest,
 	stream tgsbpb.TylerSandboxService_ServerStreamIntServer,
 ) error {
@@ -38,7 +38,7 @@ func (s *exampleServer) ServerStreamInt(
 	}
 }
 
-func (s *exampleServer) ServerStreamString(
+func (s *ExampleServer) ServerStreamString(
 	req *tgsbpb.ServerStreamStringRequest,
 	stream tgsbpb.TylerSandboxService_ServerStreamStringServer,
 ) error {
