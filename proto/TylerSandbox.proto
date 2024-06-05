@@ -15,7 +15,7 @@ service TylerSandboxService {
   rpc ClientStreamInt(stream ClientStreamIntRequest) returns (ClientStreamIntResponse) {}
 
   rpc BidirectionalStreamString(stream BidirectionalStreamStringRequest) returns (stream BidirectionalStreamStringResponse) {}
-  rpc BidirectionalStreamInt(stream BidirectionalStreamIntRequest) returns (stream BidirectionalStreamIntResponse) {}
+  // rpc BidirectionalStreamInt(stream BidirectionalStreamIntRequest) returns (stream BidirectionalStreamIntResponse) {}
 }
 
 message UnaryCallStringRequest {
@@ -36,6 +36,9 @@ message UnaryCallIntResponse {
 
 message ServerStreamStringRequest {
   string value = 1;
+  uint32 send_period_seconds = 2;
+  uint32 close_at_nth_response = 3;
+  uint32 send_error_at_nth_response = 4;
 }
 
 message ServerStreamStringResponse {
@@ -44,6 +47,9 @@ message ServerStreamStringResponse {
 
 message ServerStreamIntRequest {
   int32 value = 1;
+  uint32 send_period_seconds = 2;
+  uint32 close_at_nth_response = 3;
+  uint32 send_error_at_nth_response = 4;
 }
 
 message ServerStreamIntResponse {
@@ -52,6 +58,8 @@ message ServerStreamIntResponse {
 
 message ClientStreamStringRequest {
   string value = 1;
+  bool close = 2;
+  bool respond_with_error = 3;
 }
 
 message ClientStreamStringResponse {
@@ -60,6 +68,8 @@ message ClientStreamStringResponse {
 
 message ClientStreamIntRequest {
   int32 value = 1;
+  bool close = 2;
+  bool respond_with_error = 3;
 }
 
 message ClientStreamIntResponse {
@@ -68,18 +78,12 @@ message ClientStreamIntResponse {
 
 message BidirectionalStreamStringRequest {
   string value = 1;
+  bool close = 2;
+  bool respond_with_error = 3;
 }
 
 message BidirectionalStreamStringResponse {
   string value = 1;
-}
-
-message BidirectionalStreamIntRequest {
-  int32 value = 1;
-}
-
-message BidirectionalStreamIntResponse {
-  int32 value = 1;
 }
 
 
