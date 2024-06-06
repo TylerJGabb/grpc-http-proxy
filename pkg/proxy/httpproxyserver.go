@@ -56,10 +56,11 @@ func (hps *HttpProxyServer) RunBlocking() error {
 	}
 	client := tgsbpb.NewTylerSandboxServiceClient(conn)
 	app := gin.New()
-	app.Use(func(context *gin.Context) {
-		context.Set("client", client)
+	app.POST("/unarycallint", func(c *gin.Context) {
+		unary.ProxyRequest(c, &tgsbpb.UnaryCallIntRequest{}, client.UnaryCallInt)
 	})
-	app.POST("/unarycallstring", unary.ProxyStringRequest)
-	app.POST("/unarycallint", unary.ProxyIntRequest)
+	app.POST("/unarycallstring", func(c *gin.Context) {
+		unary.ProxyRequest(c, &tgsbpb.UnaryCallStringRequest{}, client.UnaryCallString)
+	})
 	return app.Run(fmt.Sprintf(":%d", hps.port))
 }
