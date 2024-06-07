@@ -2,6 +2,7 @@ package serverstream_test
 
 import (
 	"context"
+	"errors"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -16,13 +17,17 @@ import (
 )
 
 type mockGrpcClientStream struct {
-	trigger   chan bool
-	toReceive string
+	trigger     chan bool
+	toReceive   string
+	returnError string
 }
 
 func (s mockGrpcClientStream) RecvMsg(m any) error {
 	value := &wrapperspb.StringValue{Value: s.toReceive}
 	<-s.trigger
+	if s.returnError != "" {
+		return errors.New(s.returnError)
+	}
 	payload, err := protojson.Marshal(value)
 	if err != nil {
 		return err
@@ -38,6 +43,7 @@ type mockOpenStreamFunc struct {
 	toReceive            string
 	receivedRequest      *wrapperspb.StringValue
 	mockGrpcClientStream mockGrpcClientStream
+	returnError          string
 }
 
 func (m *mockOpenStreamFunc) openStreamFunc(
@@ -47,8 +53,9 @@ func (m *mockOpenStreamFunc) openStreamFunc(
 ) (mockGrpcClientStream, error) {
 	m.receivedRequest = req
 	m.mockGrpcClientStream = mockGrpcClientStream{
-		trigger:   make(chan bool),
-		toReceive: m.toReceive,
+		trigger:     make(chan bool),
+		toReceive:   m.toReceive,
+		returnError: m.returnError,
 	}
 	return m.mockGrpcClientStream, nil
 }
@@ -126,7 +133,55 @@ func Test_ServerStreamProxy(t *testing.T) {
 	})
 
 	t.Run("propagates server error to client with CloseInternalServerErr close frame", func(t *testing.T) {
+		expectedErrorFromServer := "error-from-server"
+		expectedValueFromRequest := "parsed-value-from-request"
 
+		mockedOpenStreamFunc := &mockOpenStreamFunc{
+			returnError: expectedErrorFromServer,
+		}
+
+		parseRequest := func(c *gin.Context) (*wrapperspb.StringValue, error) {
+			return &wrapperspb.StringValue{
+				Value: expectedValueFromRequest,
+			}, nil
+		}
+
+		app := gin.New()
+		app.GET("/test", func(c *gin.Context) {
+			serverstream.ServerStreamProxy(
+				c,
+				mockedOpenStreamFunc.openStreamFunc,
+				parseRequest,
+				&wrapperspb.StringValue{},
+			)
+		})
+		s := httptest.NewServer(app)
+		defer s.Close()
+
+		url := "ws" + strings.TrimPrefix(s.URL, "http") + "/test"
+		conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+		if err != nil {
+			t.Fatalf("failed to dial websocket: %v\n", err)
+		}
+		defer conn.Close()
+
+		errs := make(chan error)
+		go func() {
+			_, _, err := conn.ReadMessage()
+			errs <- err
+		}()
+		mockedOpenStreamFunc.mockGrpcClientStream.TriggerReceive()
+		select {
+		case err := <-errs:
+			if !websocket.IsCloseError(err, websocket.CloseInternalServerErr) {
+				t.Fatalf("expected error to be CloseInternalServerErr, got %v\n", err)
+			}
+			if !strings.Contains(err.Error(), expectedErrorFromServer) {
+				t.Fatalf("expected error message to contain '%s', got %s\n", expectedErrorFromServer, err.Error())
+			}
+		case <-time.After(1 * time.Second):
+			t.Fatalf("timed out waiting for message from websocket\n")
+		}
 	})
 
 }
