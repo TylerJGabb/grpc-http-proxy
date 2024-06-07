@@ -106,11 +106,13 @@ func ServerStreamProxy[T, S proto.Message, U GrpcClientStreamFacade](
 	fmt.Printf("beginning server stream proxy %p\n", c.Request.Context())
 	incomingRequest, err := parseRequest(c)
 	if err != nil {
+		fmt.Printf("error parsing request: %v\n", err)
 		c.String(400, err.Error())
 		return
 	}
 	stream, err := openStreamFunc(c.Request.Context(), incomingRequest)
 	if err != nil {
+		fmt.Printf("error opening stream: %v\n", err)
 		c.String(500, err.Error())
 		return
 	}
