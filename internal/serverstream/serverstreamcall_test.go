@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TylerJGabb/grpc-http-proxy/internal/serverstream"
 	"github.com/gin-gonic/gin"
@@ -15,11 +16,13 @@ import (
 )
 
 type mockGrpcClientStream struct {
+	trigger   chan bool
 	toReceive string
 }
 
 func (s mockGrpcClientStream) RecvMsg(m any) error {
 	value := &wrapperspb.StringValue{Value: s.toReceive}
+	<-s.trigger
 	payload, err := protojson.Marshal(value)
 	if err != nil {
 		return err
@@ -27,9 +30,14 @@ func (s mockGrpcClientStream) RecvMsg(m any) error {
 	return protojson.Unmarshal(payload, m.(*wrapperspb.StringValue))
 }
 
+func (s mockGrpcClientStream) TriggerReceive() {
+	s.trigger <- true
+}
+
 type mockOpenStreamFunc struct {
-	toReceive       string
-	receivedRequest *wrapperspb.StringValue
+	toReceive            string
+	receivedRequest      *wrapperspb.StringValue
+	mockGrpcClientStream mockGrpcClientStream
 }
 
 func (m *mockOpenStreamFunc) openStreamFunc(
@@ -38,13 +46,14 @@ func (m *mockOpenStreamFunc) openStreamFunc(
 	_ ...grpc.CallOption,
 ) (mockGrpcClientStream, error) {
 	m.receivedRequest = req
-	return mockGrpcClientStream{
+	m.mockGrpcClientStream = mockGrpcClientStream{
+		trigger:   make(chan bool),
 		toReceive: m.toReceive,
-	}, nil
+	}
+	return m.mockGrpcClientStream, nil
 }
 
 func Test_ServerStreamProxy(t *testing.T) {
-	// the proxy will proxy server stream messages over the socket connection
 	t.Run("proxies server sent messages over the socket connection", func(t *testing.T) {
 		expectedValueFromServer := "received-from-server"
 		expectedValueFromRequest := "parsed-value-from-request"
@@ -78,9 +87,23 @@ func Test_ServerStreamProxy(t *testing.T) {
 		}
 		defer conn.Close()
 
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			t.Fatalf("failed to read message from websocket: %v\n", err)
+		received := make(chan []byte)
+		errs := make(chan error, 1)
+		go func() {
+			_, msg, err := conn.ReadMessage()
+			if err != nil {
+				errs <- err
+			}
+			received <- msg
+		}()
+		mockedOpenStreamFunc.mockGrpcClientStream.TriggerReceive()
+		var msg []byte
+		select {
+		case err := <-errs:
+			t.Fatalf("error reading from websocket: %v\n", err)
+		case msg = <-received:
+		case <-time.After(1 * time.Second):
+			t.Fatalf("timed out waiting for message from websocket\n")
 		}
 
 		if mockedOpenStreamFunc.receivedRequest.Value != expectedValueFromRequest {
@@ -101,4 +124,9 @@ func Test_ServerStreamProxy(t *testing.T) {
 			)
 		}
 	})
+
+	t.Run("propagates server error to client with CloseInternalServerErr close frame", func(t *testing.T) {
+
+	})
+
 }

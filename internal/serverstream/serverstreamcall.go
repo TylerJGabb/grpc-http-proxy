@@ -2,11 +2,16 @@ package serverstream
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -17,8 +22,10 @@ func awaitClosedConnection(conn *websocket.Conn) {
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
 				fmt.Printf("client closed connection\n")
+			} else if strings.Contains(err.Error(), "use of closed network connection") {
+				fmt.Printf("connection already closed\n")
 			} else {
-				fmt.Printf("error reading from client: %v\n", err)
+				fmt.Printf("unexpected error from websocket client: %v\n", err)
 			}
 			return
 		}
@@ -40,26 +47,45 @@ type GrpcClientStreamFacade interface {
 	RecvMsg(m any) error
 }
 
+func handleStreamError(err error, conn *websocket.Conn) {
+	if errors.Is(err, context.Canceled) {
+		fmt.Printf("proxy loop context cancelled\n")
+	} else if errors.Is(err, io.EOF) {
+		fmt.Printf("grpc serverstream ended\n")
+		closeConnection(conn, websocket.CloseNormalClosure, "server stream ended")
+	} else if grpcStatus, ok := status.FromError(err); ok {
+		if grpcStatus.Code() == codes.Canceled {
+			fmt.Printf("grpc serverstream cancelled\n")
+		} else {
+			fmt.Printf("grpc error: %v\n", grpcStatus.Message())
+			closeConnection(conn, websocket.CloseInternalServerErr, grpcStatus.Message())
+		}
+	} else {
+		fmt.Printf("error receiving response from stream: %v\n", err)
+		closeConnection(conn, websocket.CloseInternalServerErr, err.Error())
+	}
+}
+
 func beginProxyLoopAsync(
 	conn *websocket.Conn,
 	stream GrpcClientStreamFacade,
 	streamResponse proto.Message,
 ) {
 	// this go function will return out and die when the stream's context is done
-	// we passed the gin context to the openStreamFunc which means that the stream
+	// we passed the gin's request context to the openStreamFunc which means that the stream
 	// will close when the request is done
 	go func() {
 		defer fmt.Printf("proxy loop is done\n")
-		defer closeConnection(conn, websocket.CloseNormalClosure, "server stream ended")
 		for {
-			err := stream.RecvMsg(streamResponse)
-			if err != nil {
-				fmt.Printf("error receiving response from stream: %v\n", err)
+			// blocks until a message is received, context is done, or an error occurs
+			if err := stream.RecvMsg(streamResponse); err != nil {
+				handleStreamError(err, conn)
 				return
 			}
 			responsePayload, err := protojson.Marshal(streamResponse)
 			if err != nil {
 				fmt.Printf("error marshalling response: %v\n", err)
+				closeConnection(conn, websocket.CloseInternalServerErr, err.Error())
 				return
 			}
 			err = conn.WriteMessage(websocket.TextMessage, responsePayload)
@@ -77,16 +103,13 @@ func ServerStreamProxy[T, S proto.Message, U GrpcClientStreamFacade](
 	parseRequest func(c *gin.Context) (T, error),
 	streamResponse S,
 ) {
-	go func() {
-		<-c.Request.Context().Done()
-		fmt.Printf("gin context is done\n")
-	}()
+	fmt.Printf("beginning server stream proxy %p\n", c.Request.Context())
 	incomingRequest, err := parseRequest(c)
 	if err != nil {
 		c.String(400, err.Error())
 		return
 	}
-	stream, err := openStreamFunc(c, incomingRequest)
+	stream, err := openStreamFunc(c.Request.Context(), incomingRequest)
 	if err != nil {
 		c.String(500, err.Error())
 		return
@@ -97,6 +120,7 @@ func ServerStreamProxy[T, S proto.Message, U GrpcClientStreamFacade](
 		c.String(500, err.Error())
 		return
 	}
+	defer conn.Close()
 	beginProxyLoopAsync(conn, stream, streamResponse)
 
 	// we await a closed connection before returning
