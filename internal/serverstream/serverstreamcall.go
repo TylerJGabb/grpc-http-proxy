@@ -36,9 +36,13 @@ func closeConnection(conn *websocket.Conn, closeCode int, msg string) {
 	conn.Close()
 }
 
+type GrpcClientStreamFacade interface {
+	RecvMsg(m any) error
+}
+
 func beginProxyLoopAsync(
 	conn *websocket.Conn,
-	stream grpc.ClientStream,
+	stream GrpcClientStreamFacade,
 	streamResponse proto.Message,
 ) {
 	// this go function will return out and die when the stream's context is done
@@ -67,7 +71,7 @@ func beginProxyLoopAsync(
 	}()
 }
 
-func ServerStreamProxy[T, S proto.Message, U grpc.ClientStream](
+func ServerStreamProxy[T, S proto.Message, U GrpcClientStreamFacade](
 	c *gin.Context,
 	openStreamFunc func(context.Context, T, ...grpc.CallOption) (U, error),
 	parseRequest func(c *gin.Context) (T, error),
