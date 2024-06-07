@@ -4,6 +4,7 @@ go 1.21.4
 
 require (
 	github.com/gin-gonic/gin v1.10.0
+	github.com/gorilla/websocket v1.5.1
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.1
 )
