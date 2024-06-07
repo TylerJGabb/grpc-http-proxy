@@ -98,9 +98,16 @@ func ServerStreamProxy[T, S proto.Message, U GrpcClientStreamFacade](
 		return
 	}
 	beginProxyLoopAsync(conn, stream, streamResponse)
-	// we await a closed connection to know when to stop reading from the stream
+
+	// we await a closed connection before returning
 	// two actors can close the stream
 	// 1. the client can close their connection, by ending the websocket connection
 	// 2. the server can close the stream, inside of the proxy loop
+	// once returned, the parent context (inside of gin.Context) will be done
+
+	// killing the goroutine that is running the proxy loop.
+
+	// if the proxy loop was the one that closed the connection,
+	// it is a given that the goroutine is already dead
 	awaitClosedConnection(conn)
 }
