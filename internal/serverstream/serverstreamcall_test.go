@@ -3,11 +3,12 @@ package serverstream_test
 import (
 	"errors"
 	"fmt"
-	"github.com/TylerJGabb/grpc-http-proxy/internal/serverstream/testutils"
 	"io"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TylerJGabb/grpc-http-proxy/internal/serverstream/testutils"
 
 	"github.com/TylerJGabb/grpc-http-proxy/internal/serverstream"
 	"github.com/gin-gonic/gin"
@@ -150,7 +151,7 @@ func Test_ServerStreamProxy(t *testing.T) {
 			}, nil
 		}
 
-		dead := false
+		dead := make(chan bool, 1)
 		handler := func(c *gin.Context) {
 			serverstream.ServerStreamProxy(
 				c,
@@ -158,7 +159,7 @@ func Test_ServerStreamProxy(t *testing.T) {
 				parseRequest,
 				&wrapperspb.StringValue{},
 			)
-			dead = true
+			dead <- true
 		}
 
 		events, closeFunc, err := testutils.OpenWebsocket(handler)
@@ -188,8 +189,9 @@ func Test_ServerStreamProxy(t *testing.T) {
 			t.Fatalf("expected error from websocket, got nil\n")
 		}
 
-		time.Sleep(1 * time.Second)
-		if !dead {
+		select {
+		case <-dead:
+		case <-time.After(2 * time.Second):
 			t.Fatalf("expected handler to be dead after client closes connection\n")
 		}
 	})
