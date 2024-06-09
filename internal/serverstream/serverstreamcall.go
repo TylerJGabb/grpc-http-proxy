@@ -43,7 +43,7 @@ func closeConnection(conn *websocket.Conn, closeCode int, msg string) {
 	conn.Close()
 }
 
-type GrpcClientStreamFacade interface {
+type GrpcClientStream interface {
 	RecvMsg(m any) error
 }
 
@@ -66,38 +66,36 @@ func handleStreamError(err error, conn *websocket.Conn) {
 	}
 }
 
-func beginProxyLoopAsync(
+func proxyLoop(
 	conn *websocket.Conn,
-	stream GrpcClientStreamFacade,
+	stream GrpcClientStream,
 	streamResponse proto.Message,
 ) {
 	// this go function will return out and die when the stream's context is done
 	// we passed the gin's request context to the openStreamFunc which means that the stream
 	// will close when the request is done
-	go func() {
-		defer fmt.Printf("proxy loop is done\n")
-		for {
-			// blocks until a message is received, context is done, or an error occurs
-			if err := stream.RecvMsg(streamResponse); err != nil {
-				handleStreamError(err, conn)
-				return
-			}
-			responsePayload, err := protojson.Marshal(streamResponse)
-			if err != nil {
-				fmt.Printf("error marshalling response: %v\n", err)
-				closeConnection(conn, websocket.CloseInternalServerErr, err.Error())
-				return
-			}
-			err = conn.WriteMessage(websocket.TextMessage, responsePayload)
-			if err != nil {
-				fmt.Printf("error writing response to websocket connection: %v\n", err)
-				return
-			}
+	defer fmt.Printf("proxy loop is done\n")
+	for {
+		// blocks until a message is received, context is done, or an error occurs
+		if err := stream.RecvMsg(streamResponse); err != nil {
+			handleStreamError(err, conn)
+			return
 		}
-	}()
+		responsePayload, err := protojson.Marshal(streamResponse)
+		if err != nil {
+			fmt.Printf("error marshalling response: %v\n", err)
+			closeConnection(conn, websocket.CloseInternalServerErr, err.Error())
+			return
+		}
+		err = conn.WriteMessage(websocket.TextMessage, responsePayload)
+		if err != nil {
+			fmt.Printf("error writing response to websocket connection: %v\n", err)
+			return
+		}
+	}
 }
 
-func ServerStreamProxy[T, S proto.Message, U GrpcClientStreamFacade](
+func ServerStreamProxy[T, S proto.Message, U GrpcClientStream](
 	c *gin.Context,
 	openStreamFunc func(context.Context, T, ...grpc.CallOption) (U, error),
 	parseRequest func(c *gin.Context) (T, error),
@@ -123,7 +121,7 @@ func ServerStreamProxy[T, S proto.Message, U GrpcClientStreamFacade](
 		return
 	}
 	defer conn.Close()
-	beginProxyLoopAsync(conn, stream, streamResponse)
+	go proxyLoop(conn, stream, streamResponse)
 
 	// we await a closed connection before returning
 	// two actors can close the stream
