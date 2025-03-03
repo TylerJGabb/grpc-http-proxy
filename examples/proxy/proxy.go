@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+
 	"google.golang.org/grpc/credentials/insecure"
 
 	server "github.com/TylerJGabb/grpc-http-proxy/examples/server/impl"
@@ -10,7 +11,7 @@ import (
 
 func main() {
 	exampleServer := server.ExampleServer{}
-	addr := exampleServer.Start(9091)
+	addr := exampleServer.Start(9092)
 
 	port := flag.Int("port", 8080, "the port number")
 	flag.Parse()

@@ -1,10 +1,7 @@
 package server
 
 import (
-	"context"
-	"fmt"
-	"io"
-
+	"github.com/TylerJGabb/grpc-http-proxy/internal/logging"
 	"github.com/TylerJGabb/grpc-http-proxy/pkg/tgsbpb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -13,50 +10,42 @@ import (
 func (s *ExampleServer) BidirectionalStreamInt(
 	stream tgsbpb.TylerSandboxService_BidirectionalStreamIntServer,
 ) error {
-	// when we return out of this method, the context of the stream will be canceled
-	ctx, cancel := context.WithCancel(stream.Context())
-	defer cancel()
+	logger := logging.NewLogger(logging.WithOperationId("server.BidirectionalStreamInt"))
+	logger.Info("stream starting")
 	in := make(chan *tgsbpb.BidirectionalStreamIntRequest)
-	errs := make(chan error, 1)
 	go func() {
+		defer logger.Info("server receive goroutine ended")
 		for {
 			// this is a blocking call, will unblock when stream context is canceled
 			msg, err := stream.Recv()
 			if err != nil {
-				if err == io.EOF {
-					cancel()
-				} else {
-					fmt.Printf("receive error: %s\n", err.Error())
-					errs <- err
-				}
+				logger.Info("error while receiving from stream", "err", err)
 				return
 			}
 			select {
 			case in <- msg:
-			case <-ctx.Done():
+			case <-stream.Context().Done():
 				return
 			}
 		}
 	}()
 	for {
 		select {
-		case err := <-errs:
-			return err
-		case <-ctx.Done():
+		case <-stream.Context().Done():
 			return nil
 		case req := <-in:
 			if req.Close {
-				cancel()
+				logger.Info("server is closing the stream intentionally")
 				return status.Error(codes.Canceled, "stream closed intentionally")
 			}
 			if req.RespondWithError {
+				logger.Info("server is intentionally returning error")
 				return status.Error(codes.Internal, "error returned intentionally")
 			}
 			send := &tgsbpb.BidirectionalStreamIntResponse{Value: req.Value}
-			// this is a blocking call, will unblock when stream context is canceled
+			logger.Info("sending response", "value", send.Value)
 			if err := stream.Send(send); err != nil {
-				fmt.Printf("send error: %s\n", err.Error())
-				return err
+				logger.Info("unexpected error while sending on stream", "err", err)
 			}
 		}
 	}
